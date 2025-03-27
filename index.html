@@ -2056,11 +2056,25 @@
       });
       
       // Volume sliders
+      
       melodyVolumeSlider.addEventListener('input', function() {
-        state.melodyVolume = parseInt(this.value);
-        melodyVolumeValue.textContent = state.melodyVolume;
-        updateAudioParams();
-      });
+  state.melodyVolume = parseInt(this.value);
+  melodyVolumeValue.textContent = state.melodyVolume;
+  
+  // If a melody is currently playing, update its volume and regenerate
+  if (state.isPlaying) {
+    // If a previous part exists, dispose of it
+    if (part) {
+      part.dispose();
+    }
+    
+    // Regenerate the melody with the current style and new volume
+    updateMelodyStyle();
+  }
+  
+  // Ensure the audio parameters are updated globally
+  updateAudioParams();
+});
       
       chordVolumeSlider.addEventListener('input', function() {
         state.chordVolume = parseInt(this.value);
@@ -2146,86 +2160,93 @@
       });
       
       // Function to update melody based on style parameters
-      function updateMelodyStyle() {
-        if (!state.isPlaying) return;
-        
-        // Generate new melody with current style parameters
-        const newMelody = generateMelody();
-        
-        // Update melody part in real-time
-        if (part) {
-          part.dispose();
-        }
-        
-        // Create a polyphonic synth to handle doubled notes
-        const polySynth = new Tone.PolySynth(Tone.Synth, {
-          envelope: {
-            attack: 0.02,
-            decay: 0.1,
-            sustain: 0.3,
-            release: 0.5
-          }
-        }).connect(reverb);
-        
-        part = new Tone.Part((time, note) => {
-          // Apply style modifications
-          let duration = note.duration;
-          let velocity = note.velocity || 0.7; // Default velocity if not set
-          
-          // Modify note based on style
-          switch (state.melodyStyle) {
-            case 'staccato':
-              duration = '16n'; // Slightly longer than before to avoid timing issues
-              velocity = 0.8;
-              break;
-            case 'legato':
-              duration = '4n';
-              velocity = 0.6;
-              break;
-            case 'swing':
-              // Add slight timing variation for swing feel
-              time += (Math.random() * 0.03 - 0.015); // Reduced variation
-              break;
-          }
-          
-          // Apply doubling
-          if (state.doubling !== 'none') {
-            const interval = {
-              'octave': 12,
-              'fifth': 7,
-              'third': 4
-            }[state.doubling];
-            
-            if (interval) {
-              const doubledNote = Tone.Frequency(note.note).transpose(interval).toNote();
-              // Use polySynth for doubled notes
-              polySynth.triggerAttackRelease(doubledNote, duration, time, velocity * 0.6);
-            }
-          }
-          
-          // Use polySynth for main note too
-          polySynth.triggerAttackRelease(note.note, duration, time, velocity);
-          
-          // Add note to history for visualization
-          state.noteHistory.push({
-            note: note.note,
-            time: Tone.Transport.seconds,
-            velocity: velocity
-          });
-          
-          // Keep history at reasonable size
-          if (state.noteHistory.length > 32) { // Reduced from 50 to prevent memory issues
-            state.noteHistory = state.noteHistory.slice(-32);
-          }
-        }, newMelody).start(0);
-        
-        // Clean up old synth when switching styles
-        return () => {
-          if (polySynth) {
-            polySynth.dispose();
-          }
-        };
+     function updateMelodyStyle() {
+  if (!state.isPlaying) return;
+  
+  // Generate new melody with current style parameters
+  const newMelody = generateMelody();
+  
+  // Update melody part in real-time
+  if (part) {
+    part.dispose();
+  }
+  
+  // Create a polyphonic synth to handle doubled notes
+  const polySynth = new Tone.PolySynth(Tone.Synth, {
+    volume: state.melodyVolume, // Preserve the current melody volume
+    envelope: {
+      attack: 0.02,
+      decay: 0.1,
+      sustain: 0.3,
+      release: 0.5
+    }
+  }).connect(delay); // Connect to delay instead of reverb to maintain effects chain
+  
+  part = new Tone.Part((time, note) => {
+    // Apply style modifications
+    let duration = note.duration;
+    let velocity = note.velocity || 0.7; // Default velocity if not set
+    
+    // Modify note based on style
+    switch (state.melodyStyle) {
+      case 'staccato':
+        duration = '16n'; // Slightly longer than before to avoid timing issues
+        velocity = 0.8;
+        break;
+      case 'legato':
+        duration = '4n';
+        velocity = 0.6;
+        break;
+      case 'swing':
+        // Add slight timing variation for swing feel
+        time += (Math.random() * 0.03 - 0.015); // Reduced variation
+        break;
+    }
+    
+    // Apply doubling
+    if (state.doubling !== 'none') {
+      const interval = {
+        'octave': 12,
+        'fifth': 7,
+        'third': 4
+      }[state.doubling];
+      
+      if (interval) {
+        const doubledNote = Tone.Frequency(note.note).transpose(interval).toNote();
+        // Use polySynth for doubled notes
+        polySynth.triggerAttackRelease(doubledNote, duration, time, velocity * 0.6);
       }
+    }
+    
+    // Use polySynth for main note too
+    polySynth.triggerAttackRelease(note.note, duration, time, velocity);
+    
+    // Add note to history for visualization
+    state.noteHistory.push({
+      note: note.note,
+      time: Tone.Transport.seconds,
+      velocity: velocity
+    });
+    
+    // Keep history at reasonable size
+    if (state.noteHistory.length > 32) {
+      state.noteHistory = state.noteHistory.slice(-32);
+    }
+  }, newMelody).start(0);
+  
+  // Update the melody volume slider to reflect current volume
+  melodyVolumeSlider.value = state.melodyVolume;
+  melodyVolumeValue.textContent = state.melodyVolume;
+  
+  // Clean up old synth when switching styles
+  return () => {
+    if (polySynth) {
+      polySynth.dispose();
+    }
+  };
+}
+      
+
       
       // Function to update bass style
       function updateBassStyle() {
