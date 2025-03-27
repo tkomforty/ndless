@@ -1201,26 +1201,45 @@
           }
         }).connect(delay);
         
-        bass = new Tone.MonoSynth({
-          volume: state.bassVolume,
-          oscillator: {
-            type: "sine"
-          },
-          envelope: {
-            attack: 0.05,
-            decay: 0.2,
-            sustain: 0.8,
-            release: 1.5
-          },
-          filterEnvelope: {
-            attack: 0.05,
-            decay: 0.5,
-            sustain: 0.2,
-            release: 2,
-            baseFrequency: 200,
-            octaves: 2
-          }
-        }).toDestination();
+ // Enhanced bass synth with more options
+// Replace the bass initialization in initAudioSystem() with this:
+bass = new Tone.MonoSynth({
+  volume: state.bassVolume,
+  oscillator: {
+    type: "sine"
+  },
+  envelope: {
+    attack: 0.05,
+    decay: 0.2,
+    sustain: 0.8,
+    release: 1.5
+  },
+  filter: {
+    Q: 2,
+    type: "lowpass",
+    rolloff: -24
+  },
+  filterEnvelope: {
+    attack: 0.05,
+    decay: 0.5,
+    sustain: 0.2,
+    release: 2,
+    baseFrequency: 200,
+    octaves: 2
+  }
+}).toDestination();
+
+// Add a light compressor for bass to even out dynamics
+const bassCompressor = new Tone.Compressor({
+  threshold: -20,
+  ratio: 4,
+  attack: 0.005,
+  release: 0.1
+}).toDestination();
+
+// Connect bass to compressor
+bass.disconnect(); // Disconnect from destination
+bass.connect(bassCompressor); // Connect to compressor instead
         
         chord = new Tone.PolySynth(Tone.Synth, {
           volume: state.chordVolume,
@@ -1348,6 +1367,107 @@
         updateInfoPanel();
       }
       
+      // Helper function to update bass synth settings based on style
+function updateBassSynthSettings() {
+  if (!bass) return;
+  
+  // Base settings
+  const baseSettings = {
+    volume: state.bassVolume,
+    envelope: {
+      attack: 0.05,
+      decay: 0.2,
+      sustain: 0.8,
+      release: 1.5
+    },
+    filterEnvelope: {
+      attack: 0.05,
+      decay: 0.5,
+      sustain: 0.2,
+      release: 2,
+      baseFrequency: 200,
+      octaves: 2
+    }
+  };
+  
+  // Modify settings based on style
+  switch(state.bassStyle) {
+    case 'simple':
+      // Full, sustained bass
+      bass.set({
+        oscillator: { type: "sine" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.08,
+          sustain: 0.9,
+          release: 2
+        }
+      });
+      break;
+      
+    case 'walking':
+      // More defined attack, less sustain for walking bass
+      bass.set({
+        oscillator: { type: "triangle" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.02,
+          decay: 0.15,
+          sustain: 0.6,
+          release: 0.8
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          baseFrequency: 300,
+          octaves: 3
+        }
+      });
+      break;
+      
+    case 'groovy':
+      // Punchier, more resonant sound for groove patterns
+      bass.set({
+        oscillator: { type: "triangle4" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.01,
+          decay: 0.3,
+          sustain: 0.5,
+          release: 0.6
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          attack: 0.02,
+          decay: 0.2,
+          baseFrequency: 400,
+          octaves: 4
+        }
+      });
+      break;
+      
+    case 'syncopated':
+      // Sharp attack for clear syncopation
+      bass.set({
+        oscillator: { type: "fmsquare" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.005,
+          decay: 0.1,
+          sustain: 0.3,
+          release: 0.4
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          attack: 0.01,
+          decay: 0.1,
+          baseFrequency: 500,
+          octaves: 5
+        }
+      });
+      break;
+  }
+}
+      
       // Update the info panel
       function updateInfoPanel() {
         scaleInfoBadge.textContent = `${state.scale.charAt(0).toUpperCase() + state.scale.slice(1)} Scale • ${state.root.slice(0, -1)} Key`;
@@ -1386,13 +1506,169 @@
       }
       
       // Generate bassline
-      function generateBassline(chords) {
-        return chords.map(chord => {
-          // Extract root note of chord and lower it by an octave
-          const rootNote = chord[0];
-          return rootNote.slice(0, -1) + (parseInt(rootNote.slice(-1)) - 1);
+ function generateBassline(chords) {
+  const bassNotes = [];
+  const rootOctave = parseInt(state.root.slice(-1)) - 1; // Bass typically one octave below
+  
+  chords.forEach((chord, index) => {
+    const rootNote = chord[0].slice(0, -1); // Get note without octave
+    const rootNoteIndex = rootNotes.indexOf(rootNote);
+    const scaleType = scales[state.scale];
+    
+    // Extract chord information
+    const chordRoot = rootNotes.indexOf(chord[0].slice(0, -1));
+    
+    // Different patterns based on style
+    switch(state.bassStyle) {
+      case 'simple':
+        // Just root notes on the first beat of each measure
+        bassNotes.push({
+          note: rootNote + rootOctave,
+          time: `${index}:0:0`,
+          duration: '2n'
         });
-      }
+        break;
+        
+      case 'walking':
+        // Walking bass - root, 5th, approach notes, passing tones
+        bassNotes.push({
+          note: rootNote + rootOctave,
+          time: `${index}:0:0`,
+          duration: '4n'
+        });
+        
+        // Fifth on beat 2
+        const fifthNote = rootNotes[(rootNoteIndex + 7) % 12] + rootOctave;
+        bassNotes.push({
+          note: fifthNote,
+          time: `${index}:1:0`,
+          duration: '4n'
+        });
+        
+        // Approach notes on beats 3 and 4
+        // If there's a next chord, approach its root
+        const nextChordIndex = (index + 1) % chords.length;
+        const nextRoot = chords[nextChordIndex][0].slice(0, -1);
+        const nextRootIndex = rootNotes.indexOf(nextRoot);
+        
+        // Determine approach direction
+        const stepDown = rootNotes[(nextRootIndex + 11) % 12] + rootOctave;
+        bassNotes.push({
+          note: rootNote + rootOctave,
+          time: `${index}:2:0`,
+          duration: '4n'
+        });
+        
+        bassNotes.push({
+          note: stepDown,
+          time: `${index}:3:0`,
+          duration: '4n'
+        });
+        break;
+      
+      case 'groovy':
+        // Groovy pattern with syncopation and octave jumps
+        const complexityFactor = state.bassComplexity / 100;
+        
+        // Root on beat 1
+        bassNotes.push({
+          note: rootNote + rootOctave,
+          time: `${index}:0:0`,
+          duration: '8n'
+        });
+        
+        // Syncopated pattern - varies with complexity
+        if (complexityFactor > 0.4) {
+          bassNotes.push({
+            note: rootNote + rootOctave,
+            time: `${index}:1:2`,
+            duration: '8n'
+          });
+        }
+        
+        if (complexityFactor > 0.2) {
+          bassNotes.push({
+            note: rootNote + rootOctave,
+            time: `${index}:2:0`,
+            duration: '8n'
+          });
+        }
+        
+        // Octave jump at end with high complexity
+        if (complexityFactor > 0.6) {
+          bassNotes.push({
+            note: rootNote + (rootOctave + 1),
+            time: `${index}:3:0`, 
+            duration: '8n'
+          });
+          
+          bassNotes.push({
+            note: rootNote + rootOctave,
+            time: `${index}:3:2`, 
+            duration: '8n'
+          });
+        } else {
+          bassNotes.push({
+            note: rootNote + rootOctave,
+            time: `${index}:3:0`,
+            duration: '4n'
+          });
+        }
+        break;
+        
+      case 'syncopated':
+        // Complex syncopated patterns based on rhythmic variation
+        const variationAmount = state.bassRhythmicVariation / 100;
+        
+        // Create a syncopated pattern with variable density
+        const patternDensity = Math.max(2, Math.floor(4 + 4 * variationAmount));
+        const syncopatedPositions = [];
+        
+        // First position is always the root
+        syncopatedPositions.push(0);
+        
+        // Add more positions based on rhythmic variation
+        for (let i = 0; i < patternDensity; i++) {
+          // Avoid straight beats more as variation increases
+          let position;
+          do {
+            position = Math.floor(Math.random() * 16); // 16 sixteenth notes per bar
+          } while (
+            syncopatedPositions.includes(position) || 
+            (variationAmount > 0.5 && position % 4 === 0) // Avoid downbeats with high variation
+          );
+          
+          syncopatedPositions.push(position);
+        }
+        
+        // Sort positions chronologically
+        syncopatedPositions.sort((a, b) => a - b);
+        
+        // Create notes with syncopated rhythm
+        syncopatedPositions.forEach(pos => {
+          const beat = Math.floor(pos / 4);
+          const sixteenth = pos % 4;
+          
+          // Choose note - sometimes fifth or third instead of root
+          let note = rootNote;
+          if (Math.random() < variationAmount * 0.5) {
+            // Add fifth or third occasionally
+            const interval = Math.random() > 0.5 ? 7 : 4;
+            note = rootNotes[(rootNoteIndex + interval) % 12];
+          }
+          
+          bassNotes.push({
+            note: note + rootOctave,
+            time: `${index}:${beat}:${sixteenth}`,
+            duration: '16n'
+          });
+        });
+        break;
+    }
+  });
+  
+  return bassNotes;
+}
       
       // Generate a melody based on parameters
       function generateMelody(bars = 8) {
@@ -1538,28 +1814,54 @@
         }, melody).start(0);
         
         // Play chords and bass simultaneously with melody
-        sequence = new Tone.Sequence((time, idx) => {
-          if (idx < chords.length) {
-            chord.triggerAttackRelease(chords[idx], "2n", time);
-            bass.triggerAttackRelease(bassline[idx], "2n", time);
-            
-            // Also record chord notes for visualization
-            chords[idx].forEach(chordNote => {
-              state.recordedNotes.push({
-                note: chordNote,
-                time: Tone.Transport.seconds + Tone.Time(time).toSeconds(),
-                duration: Tone.Time("2n").toSeconds()
-              });
-            });
-            
-            // Record bass note
-            state.recordedNotes.push({
-              note: bassline[idx],
-              time: Tone.Transport.seconds + Tone.Time(time).toSeconds(),
-              duration: Tone.Time("2n").toSeconds()
-            });
-          }
-        }, [...Array(chords.length).keys()], "1m").start(0);
+ // Find this section in togglePlay() function:
+// Play chords and bass simultaneously with melody
+// Play chords
+// Replace the chord and bass sequence in togglePlay() with this:
+
+// Play chords
+sequence = new Tone.Sequence((time, idx) => {
+  if (idx < chords.length) {
+    chord.triggerAttackRelease(chords[idx], "2n", time);
+    
+    // Record chord notes for visualization
+    chords[idx].forEach(chordNote => {
+      state.recordedNotes.push({
+        note: chordNote,
+        time: Tone.Transport.seconds + Tone.Time(time).toSeconds(),
+        duration: Tone.Time("2n").toSeconds()
+      });
+    });
+  }
+}, [...Array(chords.length).keys()], "1m").start(0);
+
+// Create bass part with the current style settings
+const bassNotes = generateBassline(chords);
+bassLine = new Tone.Part((time, event) => {
+  let adjustedTime = time;
+  
+  // Add subtle timing variation for groovy and walking bass
+  if (state.bassStyle === 'groovy' || state.bassStyle === 'walking') {
+    const variationAmount = state.bassRhythmicVariation / 100;
+    adjustedTime += (Math.random() * 0.02 - 0.01) * variationAmount;
+  }
+  
+  // Extract the actual note and duration from the event
+  const noteValue = event.note;
+  const durationValue = event.duration;
+  
+  bass.triggerAttackRelease(noteValue, durationValue, adjustedTime);
+  
+  // Record bass note for visualization
+  state.recordedNotes.push({
+    note: noteValue, 
+    time: Tone.Transport.seconds + Tone.Time(adjustedTime).toSeconds() - Tone.Time(time).toSeconds(),
+    duration: Tone.Time(durationValue).toSeconds()
+  });
+}, bassNotes).start(0);
+
+// Update bass synth settings for the current style
+updateBassSynthSettings();
         
         // Play drum pattern
         drumPart = new Tone.Part((time, event) => {
@@ -1972,56 +2274,122 @@
       });
       
       // Scale selector
-      scaleSelector.addEventListener('change', (e) => {
-        state.scale = e.target.value;
-        updateInfoPanel();
-        
-        // Generate new melody with new scale
-        const newMelody = generateMelody();
-        
-        // Update melody part in real-time
-        if (part) {
-          part.dispose();
-        }
-        part = new Tone.Part((time, note) => {
-          synth.triggerAttackRelease(note.note, note.duration, time);
-          
-          // Add note to history for visualization
-          state.noteHistory.push(note.note);
-          if (state.noteHistory.length > 16) {
-            state.noteHistory = state.noteHistory.slice(-16);
-          }
-        }, newMelody).start(0);
-        
-        // Generate new chord progression
-        const newChords = generateChordProgression();
-        
-        // Update chord part in real-time
-        if (sequence) {
-          sequence.dispose();
-        }
-        sequence = new Tone.Sequence((time, idx) => {
-          const currentChord = newChords[idx];
-          chord.triggerAttackRelease(currentChord, "1n", time);
-        }, [...Array(newChords.length).keys()], "1m").start(0);
-        
-        // Update bass line
-        const newBassLine = generateBassline(newChords);
-        if (bassLine) {
-          bassLine.dispose();
-        }
-        bassLine = new Tone.Sequence((time, note) => {
-          if (note) {
-            bass.triggerAttackRelease(note, "8n", time);
-          }
-        }, newBassLine, "8n").start(0);
-      });
+  // Replace the scale selector event listener with this:
+scaleSelector.addEventListener('change', (e) => {
+  state.scale = e.target.value;
+  updateInfoPanel();
+  
+  // If not playing, just update the UI
+  if (!state.isPlaying) return;
+  
+  // Generate new melody with new scale
+  const newMelody = generateMelody();
+  
+  // Update melody part in real-time
+  if (part) {
+    part.dispose();
+  }
+  part = new Tone.Part((time, note) => {
+    synth.triggerAttackRelease(note.note, note.duration, time);
+    
+    // Add note to history for visualization
+    state.noteHistory.push(note.note);
+    if (state.noteHistory.length > 16) {
+      state.noteHistory = state.noteHistory.slice(-16);
+    }
+  }, newMelody).start(0);
+  
+  // Generate new chord progression
+  const newChords = generateChordProgression();
+  
+  // Update chord part in real-time
+  if (sequence) {
+    sequence.dispose();
+  }
+  sequence = new Tone.Sequence((time, idx) => {
+    if (idx < newChords.length) {
+      const currentChord = newChords[idx];
+      chord.triggerAttackRelease(currentChord, "1n", time);
+    }
+  }, [...Array(newChords.length).keys()], "1m").start(0);
+  
+  // Update bass line correctly
+  const newBassline = generateBassline(newChords);
+  if (bassLine) {
+    bassLine.dispose();
+  }
+  
+  // Create new bass line with proper parameter handling
+  bassLine = new Tone.Part((time, event) => {
+    // Correctly extract note and duration
+    const noteValue = event.note;
+    const durationValue = event.duration;
+    
+    bass.triggerAttackRelease(noteValue, durationValue, time);
+    
+    // Record bass note for visualization
+    state.recordedNotes.push({
+      note: noteValue,
+      time: Tone.Transport.seconds + Tone.Time(time).toSeconds(),
+      duration: Tone.Time(durationValue).toSeconds()
+    });
+  }, newBassline).start(0);
+});
       
       // Root note selector
-      rootSelector.addEventListener('change', function() {
-        state.root = this.value;
-        updateInfoPanel();
+// Replace the root selector event listener with this:
+rootSelector.addEventListener('change', function() {
+  state.root = this.value;
+  updateInfoPanel();
+  
+  // If not playing, just update the UI
+  if (!state.isPlaying) return;
+  
+  // Update the melody, chords and bass with the new root note
+  const newMelody = generateMelody();
+  const newChords = generateChordProgression();
+  const newBassline = generateBassline(newChords);
+  
+  // Update parts
+  if (part) {
+    part.dispose();
+    part = new Tone.Part((time, note) => {
+      synth.triggerAttackRelease(note.note, note.duration, time);
+      
+      // Add note to history for visualization
+      state.noteHistory.push(note.note);
+      if (state.noteHistory.length > 16) {
+        state.noteHistory = state.noteHistory.slice(-16);
+      }
+    }, newMelody).start(0);
+  }
+  
+  if (sequence) {
+    sequence.dispose();
+    sequence = new Tone.Sequence((time, idx) => {
+      if (idx < newChords.length) {
+        chord.triggerAttackRelease(newChords[idx], "1n", time);
+      }
+    }, [...Array(newChords.length).keys()], "1m").start(0);
+  }
+  
+  if (bassLine) {
+    bassLine.dispose();
+    bassLine = new Tone.Part((time, event) => {
+      // Properly extract note properties
+      const noteValue = event.note;
+      const durationValue = event.duration;
+      bass.triggerAttackRelease(noteValue, durationValue, time);
+      
+      // Record bass note for visualization
+      state.recordedNotes.push({
+        note: noteValue,
+        time: Tone.Transport.seconds + Tone.Time(time).toSeconds(),
+        duration: Tone.Time(durationValue).toSeconds()
       });
+    }, newBassline).start(0);
+  }
+});
       
       // Melody density knob
       densityInput.addEventListener('input', function() {
@@ -2249,33 +2617,162 @@
 
       
       // Function to update bass style
-      function updateBassStyle() {
-        // Update bass generation based on style parameters
-        switch(state.bassStyle) {
-          case 'simple':
-            // Simple bass line following root notes
-            break;
-          case 'walking':
-            // Walking bass line with more movement
-            break;
-          case 'groovy':
-            // Groovy pattern with syncopation
-            break;
-          case 'syncopated':
-            // Complex syncopated patterns
-            break;
+function updateBassStyle() {
+  if (!state.isPlaying) return;
+  
+  // Generate new chord progression based on current scale/root
+  const chords = generateChordProgression();
+  
+  // Generate new bassline with current style parameters
+  const newBassline = generateBassline(chords);
+  
+  // Update the bass sound based on style
+  updateBassSynthSettings();
+  
+  // Update bass part in real-time
+  if (bassLine) {
+    bassLine.dispose();
+  }
+  
+  // Create new bass part - THIS IS THE FIX: properly extract note properties
+  bassLine = new Tone.Part((time, event) => {
+    // Add rhythmic variation based on style and variation parameter
+    let adjustedTime = time;
+    if (state.bassStyle === 'groovy' || state.bassStyle === 'walking') {
+      const variationAmount = state.bassRhythmicVariation / 100;
+      // Add subtle timing variation
+      adjustedTime += (Math.random() * 0.02 - 0.01) * variationAmount;
+    }
+    
+    // Extract the actual note and duration from the event
+    const noteValue = event.note;
+    const durationValue = event.duration;
+    
+    // Adjust velocity based on beat position and style
+    let velocity = 0.8;
+    if (state.bassStyle === 'syncopated') {
+      // Emphasize syncopated notes
+      velocity = 0.9;
+    } else if (event.time && event.time.includes(':0:0')) {
+      // Emphasize downbeats
+      velocity = 0.9;
+    }
+    
+    // Play the bass note with properly extracted parameters
+    bass.triggerAttackRelease(noteValue, durationValue, adjustedTime, velocity);
+    
+    // Record for visualization
+    state.recordedNotes.push({
+      note: noteValue,
+      time: Tone.Transport.seconds + Tone.Time(adjustedTime).toSeconds() - Tone.Time(time).toSeconds(),
+      duration: Tone.Time(durationValue).toSeconds()
+    });
+    
+  }, newBassline).start(0);
+  
+  console.log("Bass style updated:", state.bassStyle);
+}
+
+// Helper function to update bass synth settings based on style
+function updateBassSynthSettings() {
+  if (!bass) return;
+  
+  // Base settings
+  const baseSettings = {
+    volume: state.bassVolume,
+    envelope: {
+      attack: 0.05,
+      decay: 0.2,
+      sustain: 0.8,
+      release: 1.5
+    },
+    filterEnvelope: {
+      attack: 0.05,
+      decay: 0.5,
+      sustain: 0.2,
+      release: 2,
+      baseFrequency: 200,
+      octaves: 2
+    }
+  };
+  
+  // Modify settings based on style
+  switch(state.bassStyle) {
+    case 'simple':
+      // Full, sustained bass
+      bass.set({
+        oscillator: { type: "sine" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.08,
+          sustain: 0.9,
+          release: 2
         }
-        
-        // Adjust complexity and rhythmic variation based on slider values
-        // These will be used in the generateBassline function
-        
-        if (state.isPlaying) {
-          // Regenerate bassline with new parameters
-          const chords = generateChordProgression();
-          const bassline = generateBassline(chords);
-          // Update the playing pattern
+      });
+      break;
+      
+    case 'walking':
+      // More defined attack, less sustain for walking bass
+      bass.set({
+        oscillator: { type: "triangle" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.02,
+          decay: 0.15,
+          sustain: 0.6,
+          release: 0.8
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          baseFrequency: 300,
+          octaves: 3
         }
-      }
+      });
+      break;
+      
+    case 'groovy':
+      // Punchier, more resonant sound for groove patterns
+      bass.set({
+        oscillator: { type: "triangle4" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.01,
+          decay: 0.3,
+          sustain: 0.5,
+          release: 0.6
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          attack: 0.02,
+          decay: 0.2,
+          baseFrequency: 400,
+          octaves: 4
+        }
+      });
+      break;
+      
+    case 'syncopated':
+      // Sharp attack for clear syncopation
+      bass.set({
+        oscillator: { type: "fmsquare" },
+        envelope: {
+          ...baseSettings.envelope,
+          attack: 0.005,
+          decay: 0.1,
+          sustain: 0.3,
+          release: 0.4
+        },
+        filterEnvelope: {
+          ...baseSettings.filterEnvelope,
+          attack: 0.01,
+          decay: 0.1,
+          baseFrequency: 500,
+          octaves: 5
+        }
+      });
+      break;
+  }
+}
       
       // Update canvas size when window resizes
       window.addEventListener('resize', function() {
