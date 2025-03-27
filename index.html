@@ -746,6 +746,12 @@
             </svg>
             Melody Style
           </button>
+          <button id="toggleBassButton" class="action-button">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            Bass Style
+          </button>
         </div>
       </div>
 
@@ -922,6 +928,39 @@
           </div>
         </div>
       </div>
+
+      <!-- Bass panel -->
+      <div id="bassPanel" class="melody-panel hidden">
+        <h3 class="module-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Bass Style
+        </h3>
+        <div class="melody-controls">
+          <div class="melody-control">
+            <label for="bassStyleSelect">Style</label>
+            <select id="bassStyleSelect">
+              <option value="simple">Simple</option>
+              <option value="walking">Walking</option>
+              <option value="groovy">Groovy</option>
+              <option value="syncopated">Syncopated</option>
+            </select>
+          </div>
+          
+          <div class="melody-control">
+            <label for="bassComplexitySlider">Complexity</label>
+            <input type="range" id="bassComplexitySlider" min="0" max="100" value="50" class="slider">
+            <span id="bassComplexityValue" class="value-display">50%</span>
+          </div>
+
+          <div class="melody-control">
+            <label for="bassRhythmicVariationSlider">Rhythmic Variation</label>
+            <input type="range" id="bassRhythmicVariationSlider" min="0" max="100" value="50" class="slider">
+            <span id="bassRhythmicVariationValue" class="value-display">50%</span>
+          </div>
+        </div>
+      </div>
       
       <!-- Visualizer -->
       <div class="visualizer-container">
@@ -992,6 +1031,9 @@
         melodyReverbLevel: 0.3,
         melodyDelayLevel: 0.2,
         bassVolume: -10,
+        bassStyle: 'simple',
+        bassComplexity: 50,
+        bassRhythmicVariation: 50,
         chordVolume: -15,
         melodyVolume: -8,
         drumsVolume: -8,
@@ -1031,8 +1073,10 @@
       const exportMidiButton = document.getElementById('exportMidiButton');
       const toggleMixerButton = document.getElementById('toggleMixerButton');
       const toggleMelodyButton = document.getElementById('toggleMelodyButton');
+      const toggleBassButton = document.getElementById('toggleBassButton');
       const mixerPanel = document.getElementById('mixerPanel');
       const melodyPanel = document.getElementById('melodyPanel');
+      const bassPanel = document.getElementById('bassPanel');
       const visualizer = document.getElementById('visualizer');
       const scaleInfoBadge = document.getElementById('scaleInfoBadge');
       const densityInfoValue = document.getElementById('densityInfoValue');
@@ -1082,6 +1126,12 @@
       const noteDurationSlider = document.getElementById('noteDurationSlider');
       const noteDurationValue = document.getElementById('noteDurationValue');
       const phrasingSelect = document.getElementById('phrasingSelect');
+      
+      const bassStyleSelect = document.getElementById('bassStyleSelect');
+      const bassComplexitySlider = document.getElementById('bassComplexitySlider');
+      const bassComplexityValue = document.getElementById('bassComplexityValue');
+      const bassRhythmicVariationSlider = document.getElementById('bassRhythmicVariationSlider');
+      const bassRhythmicVariationValue = document.getElementById('bassRhythmicVariationValue');
       
       // Music theory data
       const scales = {
@@ -1545,7 +1595,7 @@
           mixerPanel.classList.remove('hidden');
           toggleMixerButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 13l-7 7-7-7M5 19l7-7 7 7" />
             </svg>
             Hide Mixer
           `;
@@ -1579,6 +1629,29 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
             Melody Style
+          `;
+        }
+      }
+      
+      // Toggle bass style panel
+      function toggleBassStyle() {
+        state.showBassPanel = !state.showBassPanel;
+        
+        if (state.showBassPanel) {
+          bassPanel.classList.remove('hidden');
+          toggleBassButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            Hide Bass Style
+          `;
+        } else {
+          bassPanel.classList.add('hidden');
+          toggleBassButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            Bass Style
           `;
         }
       }
@@ -1876,6 +1949,7 @@
       exportMidiButton.addEventListener('click', exportMidi);
       toggleMixerButton.addEventListener('click', toggleMixer);
       toggleMelodyButton.addEventListener('click', toggleMelodyStyle);
+      toggleBassButton.addEventListener('click', toggleBassStyle);
       
       // BPM control
       bpmSlider.addEventListener('input', function() {
@@ -2040,6 +2114,24 @@
         updateMelodyStyle();
       });
       
+      // Bass style controls
+      bassStyleSelect.addEventListener('change', (e) => {
+        state.bassStyle = e.target.value;
+        updateBassStyle();
+      });
+      
+      bassComplexitySlider.addEventListener('input', (e) => {
+        state.bassComplexity = parseInt(e.target.value);
+        bassComplexityValue.textContent = `${state.bassComplexity}%`;
+        updateBassStyle();
+      });
+      
+      bassRhythmicVariationSlider.addEventListener('input', (e) => {
+        state.bassRhythmicVariation = parseInt(e.target.value);
+        bassRhythmicVariationValue.textContent = `${state.bassRhythmicVariation}%`;
+        updateBassStyle();
+      });
+      
       // Function to update melody based on style parameters
       function updateMelodyStyle() {
         if (!state.isPlaying) return;
@@ -2120,6 +2212,35 @@
             polySynth.dispose();
           }
         };
+      }
+      
+      // Function to update bass style
+      function updateBassStyle() {
+        // Update bass generation based on style parameters
+        switch(state.bassStyle) {
+          case 'simple':
+            // Simple bass line following root notes
+            break;
+          case 'walking':
+            // Walking bass line with more movement
+            break;
+          case 'groovy':
+            // Groovy pattern with syncopation
+            break;
+          case 'syncopated':
+            // Complex syncopated patterns
+            break;
+        }
+        
+        // Adjust complexity and rhythmic variation based on slider values
+        // These will be used in the generateBassline function
+        
+        if (state.isPlaying) {
+          // Regenerate bassline with new parameters
+          const chords = generateChordProgression();
+          const bassline = generateBassline(chords);
+          // Update the playing pattern
+        }
       }
       
       // Update canvas size when window resizes
