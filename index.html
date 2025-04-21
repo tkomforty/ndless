@@ -687,7 +687,7 @@
     <header class="header">
       <div class="header-content">
         <div class="logo">
-          <img src="ndless.svg" alt="Ndless Logo" width="200" height="200">
+          <h1>Ndless</h1>
         </div>
       </div>
     </header>
@@ -1019,11 +1019,7 @@
     
     <!-- Footer -->
     <footer class="footer">
-      <div class="footer-links">
-        <a href="#" class="footer-link">User Guide</a>
-        <a href="#" class="footer-link">MIDI Export</a>
-        <a href="#" class="footer-link">About</a>
-      </div>
+      
       <p>Endless Generative Music System &copy; <span id="currentYear"></span></p>
     </footer>
   </div>
@@ -1854,8 +1850,8 @@ bassLine = new Tone.Part((time, event) => {
   
   // Record bass note for visualization
   state.recordedNotes.push({
-    note: noteValue, 
-    time: Tone.Transport.seconds + Tone.Time(adjustedTime).toSeconds() - Tone.Time(time).toSeconds(),
+    note: noteValue,
+    time: adjustedTime, // Use the adjusted time directly
     duration: Tone.Time(durationValue).toSeconds()
   });
 }, bassNotes).start(0);
@@ -2664,7 +2660,7 @@ function updateBassStyle() {
     // Record for visualization
     state.recordedNotes.push({
       note: noteValue,
-      time: Tone.Transport.seconds + Tone.Time(adjustedTime).toSeconds() - Tone.Time(time).toSeconds(),
+      time: adjustedTime, // Use the adjusted time directly
       duration: Tone.Time(durationValue).toSeconds()
     });
     
